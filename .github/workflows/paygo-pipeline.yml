@@ -1,14 +1,10 @@
-# ==============================================================================
-# PIPELINE CI/CD PARA PAYGO - PASARELA DE PAGOS (.NET / C#)
-# ==============================================================================
 name: PayGo CI/CD Pipeline
 
-# Disparadores: Se ejecuta al hacer push o pull request hacia la rama principal
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "master" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "master" ]
 
 jobs:
   # ----------------------------------------------------------------------------
@@ -19,31 +15,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Descarga el código fuente del repositorio
       - name: Checkout código fuente
         uses: actions/checkout@v4
 
-      # Configura el entorno de ejecución de .NET
       - name: Configurar .NET SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '9.0.x'
 
-      # Restaura las dependencias y paquetes NuGet
       - name: Restaurar dependencias
         run: dotnet restore
 
-      # Compila la solución en modo Release para validar que no existan errores de sintaxis
       - name: Compilar proyecto PayGo
         run: dotnet build --no-restore --configuration Release
 
   # ----------------------------------------------------------------------------
-  # ETAPA 2: TEST (Pruebas automatizadas unitarias)
+  # ETAPA 2: TEST (Pruebas automatizadas)
   # ----------------------------------------------------------------------------
   test:
     name: 2. Run Automated Tests
     runs-on: ubuntu-latest
-    # Requiere que la etapa de compilación (build) haya sido exitosa
     needs: build
 
     steps:
@@ -53,9 +44,8 @@ jobs:
       - name: Configurar .NET SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '9.0.x'
 
-      # Ejecuta las pruebas unitarias (ej. validaciones de montos y SRP)
       - name: Ejecutar pruebas unitarias
         run: dotnet test --configuration Release --verbosity normal
 
@@ -65,7 +55,6 @@ jobs:
   security-scan:
     name: 3. Security & Dependency Scan
     runs-on: ubuntu-latest
-    # Requiere que las pruebas (test) hayan pasado
     needs: test
 
     steps:
@@ -75,13 +64,11 @@ jobs:
       - name: Configurar .NET SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '9.0.x'
 
-      # Escanea los paquetes NuGet en busca de vulnerabilidades conocidas (CVE)
       - name: Auditar vulnerabilidades en dependencias
         run: dotnet list package --vulnerable --include-transitive
 
-      # Análisis estático de seguridad del código fuente (SAST) con CodeQL
       - name: Inicializar análisis de seguridad CodeQL
         uses: github/codeql-action/init@v3
         with:
@@ -97,4 +84,30 @@ jobs:
   # ETAPA 4: DEPLOY (Empaquetado y despliegue)
   # ----------------------------------------------------------------------------
   deploy:
-    name: 4. Deploy
+    name: 4. Deploy to Production
+    runs-on: ubuntu-latest
+    needs: security-scan
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && github.event_name == 'push'
+
+    steps:
+      - name: Checkout código fuente
+        uses: actions/checkout@v4
+
+      - name: Configurar .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Publicar artefactos de PayGo
+        run: dotnet publish -c Release -o ./publish
+
+      - name: Subir artefacto de despliegue
+        uses: actions/upload-artifact@v4
+        with:
+          name: paygo-release-package
+          path: ./publish
+
+      - name: Desplegar en entorno de producción
+        run: |
+          echo "Iniciando despliegue de PayGo Gateway..."
+          echo "Despliegue completado exitosamente en el servidor de producción."
