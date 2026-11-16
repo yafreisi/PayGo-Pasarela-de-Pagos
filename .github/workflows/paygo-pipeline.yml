@@ -1,0 +1,100 @@
+# ==============================================================================
+# PIPELINE CI/CD PARA PAYGO - PASARELA DE PAGOS (.NET / C#)
+# ==============================================================================
+name: PayGo CI/CD Pipeline
+
+# Disparadores: Se ejecuta al hacer push o pull request hacia la rama principal
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # ----------------------------------------------------------------------------
+  # ETAPA 1: BUILD (Compilación del proyecto)
+  # ----------------------------------------------------------------------------
+  build:
+    name: 1. Build Application
+    runs-on: ubuntu-latest
+
+    steps:
+      # Descarga el código fuente del repositorio
+      - name: Checkout código fuente
+        uses: actions/checkout@v4
+
+      # Configura el entorno de ejecución de .NET
+      - name: Configurar .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # Restaura las dependencias y paquetes NuGet
+      - name: Restaurar dependencias
+        run: dotnet restore
+
+      # Compila la solución en modo Release para validar que no existan errores de sintaxis
+      - name: Compilar proyecto PayGo
+        run: dotnet build --no-restore --configuration Release
+
+  # ----------------------------------------------------------------------------
+  # ETAPA 2: TEST (Pruebas automatizadas unitarias)
+  # ----------------------------------------------------------------------------
+  test:
+    name: 2. Run Automated Tests
+    runs-on: ubuntu-latest
+    # Requiere que la etapa de compilación (build) haya sido exitosa
+    needs: build
+
+    steps:
+      - name: Checkout código fuente
+        uses: actions/checkout@v4
+
+      - name: Configurar .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # Ejecuta las pruebas unitarias (ej. validaciones de montos y SRP)
+      - name: Ejecutar pruebas unitarias
+        run: dotnet test --configuration Release --verbosity normal
+
+  # ----------------------------------------------------------------------------
+  # ETAPA 3: SECURITY SCAN (Análisis de vulnerabilidades y seguridad)
+  # ----------------------------------------------------------------------------
+  security-scan:
+    name: 3. Security & Dependency Scan
+    runs-on: ubuntu-latest
+    # Requiere que las pruebas (test) hayan pasado
+    needs: test
+
+    steps:
+      - name: Checkout código fuente
+        uses: actions/checkout@v4
+
+      - name: Configurar .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # Escanea los paquetes NuGet en busca de vulnerabilidades conocidas (CVE)
+      - name: Auditar vulnerabilidades en dependencias
+        run: dotnet list package --vulnerable --include-transitive
+
+      # Análisis estático de seguridad del código fuente (SAST) con CodeQL
+      - name: Inicializar análisis de seguridad CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: csharp
+
+      - name: Compilar para análisis CodeQL
+        run: dotnet build --configuration Release
+
+      - name: Finalizar y reportar hallazgos de seguridad
+        uses: github/codeql-action/analyze@v3
+
+  # ----------------------------------------------------------------------------
+  # ETAPA 4: DEPLOY (Empaquetado y despliegue)
+  # ----------------------------------------------------------------------------
+  deploy:
+    name: 4. Deploy
