@@ -6,17 +6,12 @@ on:
   pull_request:
     branches: [ "main", "master" ]
 
-
-# Permisos necesarios para que CodeQL suba el análisis de seguridad
 permissions:
   actions: read
   contents: read
   security-events: write
 
 jobs:
-  # ----------------------------------------------------------------------------
-  # ETAPA 1: BUILD (Compilación del proyecto)
-  # ----------------------------------------------------------------------------
   build:
     name: 1. Build Application
     runs-on: ubuntu-latest
@@ -36,9 +31,6 @@ jobs:
       - name: Compilar proyecto PayGo
         run: dotnet build --no-restore --configuration Release
 
-  # ----------------------------------------------------------------------------
-  # ETAPA 2: TEST (Pruebas automatizadas)
-  # ----------------------------------------------------------------------------
   test:
     name: 2. Run Automated Tests
     runs-on: ubuntu-latest
@@ -56,9 +48,6 @@ jobs:
       - name: Ejecutar pruebas unitarias
         run: dotnet test --configuration Release --verbosity normal
 
-  # ----------------------------------------------------------------------------
-  # ETAPA 3: SECURITY SCAN (Análisis de vulnerabilidades y seguridad)
-  # ----------------------------------------------------------------------------
   security-scan:
     name: 3. Security & Dependency Scan
     runs-on: ubuntu-latest
@@ -87,9 +76,6 @@ jobs:
       - name: Finalizar y reportar hallazgos de seguridad
         uses: github/codeql-action/analyze@v3
 
-  # ----------------------------------------------------------------------------
-  # ETAPA 4: DEPLOY (Empaquetado y despliegue)
-  # ----------------------------------------------------------------------------
   deploy:
     name: 4. Deploy to Production
     runs-on: ubuntu-latest
